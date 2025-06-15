@@ -2,7 +2,7 @@
 name = "logfmt_nostd"
 version = "0.1.0"
 edition = "2024"
-authors = ["Michaela Scholten <michael-scholten@hotmail.nl>"]
+authors = ["Michael Scholten <michael-scholten@hotmail.nl>"]
 description = "Parses logfmt messages without std."
 license-file = "License.txt"
 repository = "https://github.com/41Leahcim/logfmt_nostd"
