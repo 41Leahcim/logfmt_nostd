@@ -9,20 +9,30 @@ use alloc::{
 };
 use core::fmt::Write as _;
 
+/// An error returned when an open string is found
 #[derive(Debug)]
 pub struct UnclosedString;
 
-pub enum Token<'message> {
+/// A token in the log message
+enum Token<'message> {
     Word(&'message str),
     Attribute(&'message str, &'message str),
 }
 
 impl<'message> Token<'message> {
+    /// Parses the token from a string
     fn parse(s: &'message str) -> Self {
+        // Split the message in a key and value
+        // Return the message as word if not possible
         if let Some((key, value)) = s.split_once('=') {
+            // Remove whitespace around the key and value
             let (key, value) = (key.trim(), value.trim());
+
+            // Calculate the lengths of the key and value
             let key_length = key.chars().count();
             let value_length = value.chars().count();
+
+            // Make sure the key and value are valid, otherwise return it as a word
             if (key_length > 50 && !key.starts_with('"'))
                 || key_length > 52
                 || key
@@ -54,6 +64,7 @@ impl<'message> Token<'message> {
     }
 }
 
+/// Contains the log message
 #[derive(Debug, PartialEq, Eq)]
 pub struct Log<'message> {
     message: Cow<'message, str>,
@@ -61,24 +72,33 @@ pub struct Log<'message> {
 }
 
 impl Log<'_> {
+    /// Return the message
     pub fn message(&self) -> &str {
         &self.message
     }
 
+    /// Return the list of attributes
     pub fn attributes(&self) -> &[(&str, &str)] {
         &self.attributes
     }
 }
 
 impl<'message> Log<'message> {
+    /// Parse the log message
     pub fn parse(s: &'message str) -> Result<Self, UnclosedString> {
+        // Create a list of attributes, an iterator over the string, the message string, and a
+        // variable to store whether the message property was found.
         let mut attributes = Vec::<(&str, &str)>::new();
         let mut chars = s.char_indices();
         let mut message = String::new();
         let mut message_property_found = false;
+
+        // Iterate through the string, parsing every token.
         loop {
-            let mut in_string = false;
+            // Find the start of the token.
+            // Return the parse result if no token was found.
             let Some((start, _)) = chars.by_ref().find(|(_, ch)| !ch.is_whitespace()) else {
+                // Store the full string as message, if no message was found.
                 let message = if message.is_empty() {
                     Cow::Borrowed(s)
                 } else {
@@ -89,6 +109,9 @@ impl<'message> Log<'message> {
                     attributes,
                 });
             };
+
+            // Find the end of the token
+            let mut in_string = false;
             let end = chars
                 .by_ref()
                 .find(|(_, c)| {
@@ -97,11 +120,15 @@ impl<'message> Log<'message> {
                 })
                 .map_or_else(|| s.len(), |(end, _)| end);
 
+            // Return an error if a string wasn't closed.
             if in_string {
                 return Err(UnclosedString);
             }
+
+            // Parse the found token
             let token = &s[start..end];
             match Token::parse(token) {
+                // If it's a word, add it to the message as a word
                 Token::Word(word) => {
                     if !message_property_found {
                         if !message.is_empty() {
@@ -110,6 +137,9 @@ impl<'message> Log<'message> {
                         write!(&mut message, "{word}").unwrap();
                     }
                 }
+
+                // If it's an attribute and there is still room to add more, add it to the list
+                // or assign the new value
                 Token::Attribute(key, value) if attributes.len() < 25 => {
                     if matches!(key, "msg" | "message" | "\"msg\"" | "\"message\"") {
                         message = value.to_owned();
@@ -124,6 +154,7 @@ impl<'message> Log<'message> {
                         None => attributes.push((key, value)),
                     }
                 }
+                // If there are too many attributes, add it to the message as a single word.
                 _ => {
                     if !message_property_found {
                         if !message.is_empty() {
