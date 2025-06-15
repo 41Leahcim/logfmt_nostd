@@ -1,4 +1,5 @@
 #![no_std]
+#![warn(clippy::cargo)]
 
 extern crate alloc;
 
