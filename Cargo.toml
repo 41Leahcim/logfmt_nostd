@@ -1,6 +1,6 @@
 [package]
 name = "logfmt_nostd"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Michael Scholten <michael-scholten@hotmail.nl>"]
 description = "Parses logfmt messages without std."
@@ -11,3 +11,4 @@ keywords = ["parser", "no_std"]
 categories = ["Encoding", "No standard library", "Parser implementations"]
 
 [dependencies]
+heapless = "0.8"

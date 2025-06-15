@@ -6,9 +6,9 @@ extern crate alloc;
 use alloc::{
     borrow::{Cow, ToOwned},
     string::String,
-    vec::Vec,
 };
 use core::fmt::Write as _;
+use heapless::Vec;
 
 /// An error returned when an open string is found
 #[derive(Debug)]
@@ -69,7 +69,7 @@ impl<'message> Token<'message> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Log<'message> {
     message: Cow<'message, str>,
-    attributes: Vec<(&'message str, &'message str)>,
+    attributes: Vec<(&'message str, &'message str), 25>,
 }
 
 impl Log<'_> {
@@ -89,7 +89,7 @@ impl<'message> Log<'message> {
     pub fn parse(s: &'message str) -> Result<Self, UnclosedString> {
         // Create a list of attributes, an iterator over the string, the message string, and a
         // variable to store whether the message property was found.
-        let mut attributes = Vec::<(&str, &str)>::new();
+        let mut attributes = Vec::<(&str, &str), 25>::new();
         let mut chars = s.char_indices();
         let mut message = String::new();
         let mut message_property_found = false;
@@ -139,29 +139,33 @@ impl<'message> Log<'message> {
                     }
                 }
 
-                // If it's an attribute and there is still room to add more, add it to the list
-                // or assign the new value
-                Token::Attribute(key, value) if attributes.len() < 25 => {
+                // If it's an attribute
+                Token::Attribute(key, value) => {
+                    // Replace the message if this attribute is the message
                     if matches!(key, "msg" | "message" | "\"msg\"" | "\"message\"") {
                         message = value.to_owned();
                         message_property_found = true;
                         continue;
                     }
+
+                    // Check whether the attribute already exists
                     match attributes
                         .iter()
                         .position(|(found_key, _)| &key == found_key)
                     {
+                        // If it does, change it's value
                         Some(index) => attributes[index].1 = value,
-                        None => attributes.push((key, value)),
-                    }
-                }
-                // If there are too many attributes, add it to the message as a single word.
-                _ => {
-                    if !message_property_found {
-                        if !message.is_empty() {
-                            message.push(' ');
+                        // Otherwise, try adding it to the attributes
+                        None => {
+                            // if the list is full and no message was found yet, add it to the
+                            // message
+                            if attributes.push((key, value)).is_err() && !message_property_found {
+                                if !message.is_empty() {
+                                    message.push(' ');
+                                }
+                                write!(&mut message, "{token}").unwrap();
+                            }
                         }
-                        write!(&mut message, "{token}").unwrap();
                     }
                 }
             }
